@@ -20,7 +20,7 @@ jobs:
       - name: Run mail address checks
         id: mail-addr-checker
         env:
-          PAT: '^[a-zA-Z0-9_!#$%&''*+/=?`{|}~^.-]+@[a-zA-9.-]+$'
+          PAT: '^[a-zA-Z0-9_!#$%&''*+/=?`{|}~^.-]+@[a-zA-Z0-9]+$'
         run: |
           [ -f mail.txt ] && [ $(wc -l < mail.txt) -eq 1 ] && grep -P "$PAT" mail.txt
         continue-on-error: true
