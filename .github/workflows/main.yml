@@ -1,0 +1,66 @@
+name: Checker
+
+on:
+  pull_request_target:
+    branches: [ main ]
+    types: [ opened, synchronize ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      
+      - name: Run mail address checks
+        id: mail-addr-checker
+        env:
+          PAT: '^[a-zA-Z0-9_!#$%&''*+/=?`{|}~^.-]+@[a-zA-9.-]+$'
+        run: |
+          [ -f mail.txt ] && [ $(wc -l < mail.txt) -eq 1 ] && grep -P "$PAT" mail.txt
+        continue-on-error: true
+      
+      - name: Read mail address
+        id: mail-addr-reader
+        if: ${{ steps.mail-addr-checker.outcome == 'success' }}
+        run: |
+          echo "MAILER_TO=$(cat mail.txt)" >> "$GITHUB_OUTPUT"
+      
+      - name: Send flag via mail
+        id: mail-sender
+        if: ${{ steps.mail-addr-reader.outcome == 'success' }}
+        uses: dawidd6/action-send-mail@v3.12.0
+        with:
+          server_address: ${{ secrets.MAILER_SERVER }}
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAILER_USERNAME }}
+          password: ${{ secrets.MAILER_PASSWORD }}
+          subject: Flag for ${{ github.event.pull_request.user.login }}
+          to: ${{ steps.mail-addr-reader.outputs.MAILER_TO }}
+          from: ${{ secrets.MAILER_FROM }}
+          body: ${{ secrets.FLAG }}
+      
+      - name: Report failure
+        if: ${{ steps.mail-sender.outcome != 'success' }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body '":worried: @${{ github.event.pull_request.user.login }} did not pass checks. Fix them and push again to retry!"'
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "open"
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Report success and close PR
+        if: ${{ steps.mail-sender.outcome == 'success' }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body ":hugs: 干得漂亮！请检查你的收件箱以获取 Flag。"
+          gh pr close ${{ github.event.pull_request.number }}
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "done" --remove-label "open"
+          gh pr lock ${{ github.event.pull_request.number }} --reason "resolved"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
