@@ -11,3 +11,4 @@
 6. push你的commit到你的仓库
 7. 向本仓库的`main`分支提交一个`Pull Request`
 8. 等待你的flag！
+PS. 若没有收到邮件, 请看看垃圾邮件噢(FLAG才不是垃圾呢:(
